@@ -1,6 +1,4 @@
-﻿
-
-namespace NSBEFTest.MessageHandlers;
+﻿namespace NSBEFTest.MessageHandlers;
 
 public class SomeMessageHandler : IHandleMessages<UpdateMyDataMessage>
 {

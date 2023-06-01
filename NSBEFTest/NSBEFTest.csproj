@@ -19,6 +19,7 @@
     <PackageReference Include="NServiceBus.Extensions.Hosting" Version="2.0.0" />
     <PackageReference Include="NServiceBus.Json" Version="3.0.0" />
     <PackageReference Include="NServiceBus.Persistence.Sql" Version="7.0.2" />
+    <PackageReference Include="NServiceBus.Persistence.Sql.TransactionalSession" Version="7.0.2" />
   </ItemGroup>
 
 </Project>

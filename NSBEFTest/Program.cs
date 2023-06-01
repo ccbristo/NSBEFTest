@@ -5,7 +5,9 @@ using Amazon.SQS;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using NServiceBus.Json;
+using NServiceBus.Persistence;
 using NServiceBus.Persistence.Sql;
+using NServiceBus.TransactionalSession;
 
 namespace NSBEFTest;
 
@@ -105,30 +107,34 @@ static class Program
         var persistence = endpoint.UsePersistence<SqlPersistence>();
         persistence.ConnectionBuilder(() => new SqlConnection(connectionString));
         persistence.SqlDialect<SqlDialect.MsSqlServer>();
+        persistence.EnableTransactionalSession();
 
         endpoint.RegisterComponents(services =>
         {
             services.AddScoped(serviceProvider =>
             {
-                var session = serviceProvider.GetRequiredService<ISqlStorageSession>();
+                if (serviceProvider.GetRequiredService<ISynchronizedStorageSession>() is ISqlStorageSession { Connection: not null } session)
+                {
+                    var dbContextOptionsBuilder = new DbContextOptionsBuilder<AppDbContext>()
+                        .UseSqlServer(session.Connection);
+                    
+                    var context = new AppDbContext(dbContextOptionsBuilder.Options);
 
-                var optionsBuilder = new DbContextOptionsBuilder();
-
-                if (session.Connection != null)
-                    optionsBuilder.UseSqlServer(session.Connection);
-                else
-                    optionsBuilder.UseSqlServer(connectionString);
-
-                var context = new AppDbContext(optionsBuilder.Options);
-                
-                //Use the same underlying ADO.NET transaction
-                if(session.Transaction != null)
+                    //Use the same underlying ADO.NET transaction
                     context.Database.UseTransaction(session.Transaction);
 
-                //Ensure context is flushed before the transaction is committed
-                session.OnSaveChanges((s, token) => context.SaveChangesAsync(token));
+                    //Ensure context is flushed before the transaction is committed
+                    session.OnSaveChanges((s, cancellationToken) => context.SaveChangesAsync(cancellationToken));
 
-                return new AppDbContext(optionsBuilder.Options);
+                    return context;
+                }
+                else
+                {
+                    var context = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
+                        .UseSqlServer(connectionString)
+                        .Options);
+                    return context;
+                }
             });
         });
     }
